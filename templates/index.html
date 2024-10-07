@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO Object Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+            text-align: center;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #output {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        canvas {
+            margin-top: 20px;
+            border: 1px solid black;
+            display: none; /* הסתרת הקנבס בהתחלה */
+            max-width: 100%;
+            max-height: 500px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                max-width: 90%;
+            }
+        }
+
+        /* עיצוב הפוטר */
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #777;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload an Image for Object Detection</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="imageInput" name="file" accept="image/*">
+            <br><br>
+            <button type="submit">Upload Image</button>
+        </form>
+
+        <h2>Detected Objects</h2>
+        <div id="output"></div>
+
+        <!-- Canvas להצגת התמונה והאובייקטים -->
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <!-- הוספת הפוטר -->
+    <footer>
+        Project by Avi Veller
+    </footer>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            const file = document.getElementById('imageInput').files[0];
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+
+            img.onload = () => {
+                canvas.style.display = 'block';
+
+                const aspectRatio = img.width / img.height;
+                const maxCanvasHeight = 500;
+                const maxCanvasWidth = canvas.parentElement.clientWidth;
+
+                if (img.height > maxCanvasHeight) {
+                    canvas.height = maxCanvasHeight;
+                    canvas.width = maxCanvasHeight * aspectRatio;
+                } else if (img.width > maxCanvasWidth) {
+                    canvas.width = maxCanvasWidth;
+                    canvas.height = maxCanvasWidth / aspectRatio;
+                } else {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                }
+
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                data.forEach((object) => {
+                    const xmin = (object.xmin / img.width) * canvas.width;
+                    const ymin = (object.ymin / img.height) * canvas.height;
+                    const xmax = (object.xmax / img.width) * canvas.width;
+                    const ymax = (object.ymax / img.height) * canvas.height;
+
+                    ctx.beginPath();
+                    ctx.rect(xmin, ymin, xmax - xmin, ymax - ymin);
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = 'red';
+                    ctx.stroke();
+
+                    ctx.fillStyle = 'red';
+                    ctx.font = '16px Arial';
+                    ctx.fillText(`${object.name} (${(object.confidence * 100).toFixed(2)}%)`, xmin, ymin - 5);
+                });
+            };
+        });
+    </script>
+</body>
+</html>
